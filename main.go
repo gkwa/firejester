@@ -4,18 +4,17 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	git "github.com/go-git/go-git/v5"
+	giturls "github.com/whilp/git-urls"
 )
 
 type Timestamp struct {
-	EpochTime    int64
-	Time string
+	EpochTime int64
+	Time      string
 }
 
 type GitInfo struct {
@@ -32,12 +31,19 @@ type PackgeInfo struct {
 
 func main() {
 	var repoPath string
+	var extension string
 
 	flag.StringVar(&repoPath, "path", "", "Path to the Git repository")
+	flag.StringVar(&extension, "ext", "tar.xz", "Extension to name file")
 	flag.Parse()
 
 	if repoPath == "" {
 		fmt.Println("Error: Please provide a valid path to the Git repository using the --path flag.")
+		os.Exit(1)
+	}
+
+	if extension == "" {
+		fmt.Println("Error: Please provide a extension string to name archive file")
 		os.Exit(1)
 	}
 
@@ -77,17 +83,13 @@ func main() {
 		remoteURL = filepath.ToSlash(repoDir) // Convert to URL-friendly format
 	}
 
-	u, err := url.Parse(remoteURL)
+	u, err := giturls.Parse(remoteURL)
 	if err != nil {
+		fmt.Printf("debug: %s", u.Scheme)
 		panic(err)
 	}
 
-	// redact credentials
-	urlRedacted := strings.ReplaceAll(remoteURL, u.User.String(), "")
-	urlRedacted = strings.ReplaceAll(urlRedacted, "@", "")
-
-	fmt.Println("Remote origin URL:", urlRedacted)
-	remoteURL = urlRedacted
+	remoteURL = fmt.Sprintf("%s:%s", u.Hostname(), u.Path)
 
 	// Get the HEAD reference.
 	ref, err := r.Head()
@@ -105,18 +107,18 @@ func main() {
 
 	// Create a Timestamp struct
 	timestamp := Timestamp{
-		EpochTime:    localTime.Unix(), // Epoch time in seconds
-		Time: localTime.Format("2006-01-02 15:04:05 -0700 MST"),
+		EpochTime: localTime.Unix(), // Epoch time in seconds
+		Time:      localTime.Format(time.RFC3339),
 	}
 
-	fileName := fmt.Sprintf("%s_%d", dirName, timestamp.EpochTime)
+	fileName := fmt.Sprintf("%s_%d.%s", dirName, timestamp.EpochTime, extension)
 
 	// Create a GitInfo struct.
 	info := GitInfo{
 		SHA:      sha.String(),
 		ShortSHA: shortSHA,
 		FileName: fileName,
-		Repo:     urlRedacted,
+		Repo:     remoteURL,
 	}
 
 	pi := PackgeInfo{
@@ -131,10 +133,16 @@ func main() {
 		return
 	}
 
-	fileName2 := fmt.Sprintf("manifest_%d.json", timestamp.EpochTime)
+	cwd, err := os.Getwd()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	manifestPath := filepath.Join(cwd, fmt.Sprintf("manifest_%d.json", timestamp.EpochTime))
 
 	// Create and write to a JSON file
-	file, err := os.Create(fileName2)
+	file, err := os.Create(manifestPath)
 	if err != nil {
 		fmt.Println("Error creating JSON file:", err)
 		return
@@ -148,7 +156,7 @@ func main() {
 	}
 
 	// Apppend neline to manifest
-	f, err := os.OpenFile(fileName2, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(manifestPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		panic(err)
 	}
@@ -158,4 +166,6 @@ func main() {
 	if err := f.Close(); err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("%s\n", manifestPath)
 }
