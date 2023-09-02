@@ -15,7 +15,7 @@ import (
 
 type Timestamp struct {
 	EpochTime    int64
-	TimeWithZone string
+	Time string
 }
 
 type GitInfo struct {
@@ -106,7 +106,7 @@ func main() {
 	// Create a Timestamp struct
 	timestamp := Timestamp{
 		EpochTime:    localTime.Unix(), // Epoch time in seconds
-		TimeWithZone: localTime.Format("2006-01-02 15:04:05 -0700 MST"),
+		Time: localTime.Format("2006-01-02 15:04:05 -0700 MST"),
 	}
 
 	fileName := fmt.Sprintf("%s_%d", dirName, timestamp.EpochTime)
