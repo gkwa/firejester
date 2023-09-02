@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	git "github.com/go-git/go-git/v5"
@@ -16,43 +18,42 @@ type Timestamp struct {
 	TimeWithZone string
 }
 
-// GitInfo represents the information about a Git repository.
 type GitInfo struct {
 	SHA      string
 	ShortSHA string
 	FileName string
+	Repo     string
+}
+
+type PackgeInfo struct {
+	Timestamp
+	GitInfo
 }
 
 func main() {
-	// Define a command-line flag for the Git repository path.
-	repoPath := flag.String("path", "", "Path to the Git repository")
+	var repoPath string
+
+	flag.StringVar(&repoPath, "path", "", "Path to the Git repository")
 	flag.Parse()
 
-	// Ensure the --path flag is provided.
-	if *repoPath == "" {
+	if repoPath == "" {
 		fmt.Println("Error: Please provide a valid path to the Git repository using the --path flag.")
 		os.Exit(1)
 	}
 
-	// Open the Git repository.
-	r, err := git.PlainOpen(*repoPath)
+	r, err := git.PlainOpen(repoPath)
 	if err != nil {
 		fmt.Println("Error:", err)
 		os.Exit(1)
 	}
 
-	// Get the absolute path of the current directory
-    absPath, err := filepath.Abs(*repoPath)
-    if err != nil {
-        fmt.Println("Error:", err)
-        os.Exit(1)
-    }
+	absPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		fmt.Println("Error:", err)
+		os.Exit(1)
+	}
 
-    // Extract the basename of the directory
-    dirName := filepath.Base(absPath)
-
-    fmt.Println("Absolute Path:", absPath)
-    fmt.Println("Directory Name:", dirName)
+	dirName := filepath.Base(absPath)
 
 	// Get the remote origin
 	remotes, err := r.Remotes()
@@ -72,11 +73,21 @@ func main() {
 		}
 	} else {
 		// If there are no remotes, use the local directory name
-		repoDir := filepath.Base(*repoPath)
+		repoDir := filepath.Base(repoPath)
 		remoteURL = filepath.ToSlash(repoDir) // Convert to URL-friendly format
 	}
 
-	fmt.Println("Remote origin URL:", remoteURL)
+	u, err := url.Parse(remoteURL)
+	if err != nil {
+		panic(err)
+	}
+
+	// redact credentials
+	urlRedacted := strings.ReplaceAll(remoteURL, u.User.String(), "")
+	urlRedacted = strings.ReplaceAll(urlRedacted, "@", "")
+
+	fmt.Println("Remote origin URL:", urlRedacted)
+	remoteURL = urlRedacted
 
 	// Get the HEAD reference.
 	ref, err := r.Head()
@@ -98,22 +109,23 @@ func main() {
 		TimeWithZone: localTime.Format("2006-01-02 15:04:05 -0700 MST"),
 	}
 
-	fileName := fmt.Sprintf("archive_%d.tgz", timestamp.EpochTime)
+	fileName := fmt.Sprintf("%s_%d", dirName, timestamp.EpochTime)
 
 	// Create a GitInfo struct.
 	info := GitInfo{
 		SHA:      sha.String(),
 		ShortSHA: shortSHA,
 		FileName: fileName,
+		Repo:     urlRedacted,
 	}
 
-	// Print the GitInfo struct.
-	fmt.Println("Full SHA:", info.SHA)
-	fmt.Println("Short SHA:", info.ShortSHA)
-	fmt.Println("File Name:", info.FileName)
+	pi := PackgeInfo{
+		GitInfo:   info,
+		Timestamp: timestamp,
+	}
 
 	// Marshal the struct to an indented JSON format
-	jsonData, err := json.MarshalIndent(info, "", "    ") // Indent with four spaces
+	jsonData, err := json.MarshalIndent(pi, "", "    ") // Indent with four spaces
 	if err != nil {
 		fmt.Println("Error marshaling JSON:", err)
 		return
@@ -133,5 +145,17 @@ func main() {
 	if err != nil {
 		fmt.Println("Error writing JSON data to file:", err)
 		return
+	}
+
+	// Apppend neline to manifest
+	f, err := os.OpenFile(fileName2, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		panic(err)
+	}
+	if _, err := f.Write([]byte("\n")); err != nil {
+		panic(err)
+	}
+	if err := f.Close(); err != nil {
+		panic(err)
 	}
 }
