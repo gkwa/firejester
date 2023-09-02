@@ -21,7 +21,8 @@ type GitInfo struct {
 	SHA      string
 	ShortSHA string
 	FileName string
-	Repo     string
+	RepoHost string
+	RepoPath string
 }
 
 type PackgeInfo struct {
@@ -89,8 +90,6 @@ func main() {
 		panic(err)
 	}
 
-	remoteURL = fmt.Sprintf("%s:%s", u.Hostname(), u.Path)
-
 	// Get the HEAD reference.
 	ref, err := r.Head()
 	if err != nil {
@@ -118,7 +117,8 @@ func main() {
 		SHA:      sha.String(),
 		ShortSHA: shortSHA,
 		FileName: fileName,
-		Repo:     remoteURL,
+		RepoHost: u.Hostname(),
+		RepoPath: u.Path,
 	}
 
 	pi := PackgeInfo{
