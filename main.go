@@ -13,8 +13,8 @@ import (
 )
 
 type Timestamp struct {
-	EpochTime int64
-	Time      string
+	TimeEpoch   int64
+	TimeRFC3339 string
 }
 
 type GitInfo struct {
@@ -107,11 +107,11 @@ func main() {
 
 	// Create a Timestamp struct
 	timestamp := Timestamp{
-		EpochTime: localTime.Unix(), // Epoch time in seconds
-		Time:      localTime.Format(time.RFC3339),
+		TimeEpoch:   localTime.Unix(), // Epoch time in seconds
+		TimeRFC3339: localTime.Format(time.RFC3339),
 	}
 
-	fileName := fmt.Sprintf("%s_%d.%s", dirName, timestamp.EpochTime, extension)
+	fileName := fmt.Sprintf("%s_%d.%s", dirName, timestamp.TimeEpoch, extension)
 
 	// Create a GitInfo struct.
 	info := GitInfo{
@@ -139,7 +139,7 @@ func main() {
 		return
 	}
 
-	manifestPath := filepath.Join(cwd, fmt.Sprintf("manifest_%d.json", timestamp.EpochTime))
+	manifestPath := filepath.Join(cwd, fmt.Sprintf("manifest_%d.json", timestamp.TimeEpoch))
 
 	// Create and write to a JSON file
 	file, err := os.Create(manifestPath)
