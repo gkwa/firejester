@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.26.2
 
 require (
-	github.com/go-git/go-git/v5 v5.17.2
+	github.com/go-git/go-git/v5 v5.18.0
 	github.com/whilp/git-urls v1.0.0
 )
 
